@@ -87,13 +87,33 @@ The progress report's correlation heatmap identified the ICT block (12 columns: 
 - **Modest absolute R² is the correct expectation for FPL prediction.** Even our best model leaves 36% of variance unexplained, and football's per-game noise (red cards, bonus point allocation, defensive own goals, set-piece luck) is genuinely irreducible from pre-kickoff features. The right comparison is not to "high R²" but to whether we beat `xP`, the strongest available pre-kickoff signal — which we do, by 0.122 R² and 0.101 MAE.
 
 ## Decisions locked for Phase 2
-
+ 
 - Feature set: `BASE_PREKICKOFF + POSITION + xP + ICT_BLOCK + OTHER_LAGS`. No CLUSTER (cost val R² in 1.1 ablation).
 - Hurdle threshold: `played_any` (structural-zero cut, not a within-positive cut).
 - Stage 1: logistic regression. SVM-RBF documented as a comparison run, not selected.
 - Test set (23/24 GW 34-38) untouched.
-
 ## Phase 1 → Phase 2
-
+ 
+Phase 2 removes `xP` from the feature set and rebuilds the modeling stack. The architectural lessons carry forward: the hurdle structure is preserved, the `played_any` threshold stays, and the same lag features remain available. The MLP component required by the syllabus enters in Phase 2, where its non-linearity has the best chance of contributing — without `xP` to anchor the linear model, the gap between linear and non-linear predictors should widen.
+ 
 The headline Phase 1 → Phase 2 comparison will be: how much performance is lost when we strip out FPL's own predictor and rely only on raw stats?
+ 
+---
+ 
+## Plots to save for the writeup
+ 
+Save these from your notebooks into a `figures/` folder. I have kept the list small — five plots, each pulling its weight in a different way.
+ 
+1. **`phase1_lasso_coefficients.png`** — from Notebook 03 (1.1), the horizontal bar chart of Lasso coefficients at α=10⁻⁴. This is the single best visual for the `xP`-dominates story and the negative-coefficient-on-`total_points_roll3` finding. One plot, two narrative points.
+2. **`phase1_lr_calibration.png`** — from Notebook 04 (1.2), the LR-only reliability diagram (the first calibration plot, before the SVM overlay). Shows that stage 1's `predict_proba` outputs are usable as actual probabilities, which is what makes the multiplicative hurdle product meaningful. Skip the SVM overlay version — the LR-only version is cleaner for the writeup.
+3. **`phase1_hurdle_residuals_by_decile.png`** — from Notebook 04 (1.2), the residuals-by-`P(play)`-decile boxplot. This is the evidence for "no inference threshold needed" and visually demonstrates the multiplicative product handling DNPs. If you can only keep four plots, this is the one I'd cut, but it does carry weight for the methodological-decision section.
+4. **`phase1_pca_scree.png`** — from Notebook 06 (1.4), the scree plot (left panel of the two-panel figure if you can crop it; otherwise keep both panels). Justifies the n=5 choice from the elbow.
+5. **`phase1_pca_loadings.png`** — from Notebook 06 (1.4), the PCA loadings heatmap. The visual evidence for the two interpretive axes (involvement, style). Pairs with the scree plot to make the PCA section of the writeup self-contained.
+**Plots I deliberately did *not* recommend keeping:**
+ 
+- The Ridge alpha sweep curve (1.1): the finding is "flat across all reasonable α" — a sentence does that better than a flat line on a plot.
+- The Tweedie heatmap (1.3): instability dominates the visual; explain in prose that some configurations diverged numerically and report the best stable one in the comparison table.
+- Residuals-by-position boxplots (multiple notebooks): per-position MAE in the comparison table conveys the same information more compactly. Save one only if you specifically write a per-position discussion section.
+- The actual-vs-predicted scatter plots (multiple notebooks): they all look roughly the same and don't carry a sharp finding for the writeup. Skip.
+If your final report is heavily figure-constrained, the priority order is: 1 > 4 > 5 > 2 > 3.
 
