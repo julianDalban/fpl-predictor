@@ -1,39 +1,31 @@
 """
-Project configuration: paths, splits, feature groups, K-means parameters.
-
-This module is intentionally thin and dependency-light so model code can
-import constants and split functions without pulling in the full data
-prep pipeline.
+Project configuration to make running our models easier.
 """
 from pathlib import Path
 
 import pandas as pd
 
-# === Paths ===
+# Paths 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 RAW_DIR = PROJECT_ROOT / "data" / "raw"
 PROCESSED_DIR = PROJECT_ROOT / "data" / "processed"
 PROCESSED_PATH = PROCESSED_DIR / "fpl_modeling_data.csv"
 
-# === Seasons ===
+# Seasons 
 SEASONS = ["2021-22", "2022-23", "2023-24"]
 TRAIN_SEASONS = ["2021-22", "2022-23"]
 HOLDOUT_SEASON = "2023-24"
 
-# === Splits ===
+# Splits 
 # Train: all of TRAIN_SEASONS
-# Val:   HOLDOUT_SEASON, GW 2 through TEST_GW_START - 1  (= GW 2-33)
-# Test:  HOLDOUT_SEASON, GW TEST_GW_START through 38     (= GW 34-38, final 5 GWs)
-# Caveat: end-of-season GWs have known distribution shift (rotation in
-# secured top-4 sides, intensity in relegation battles). Per-GW evaluation
-# on val should be reported alongside aggregate metrics so the test-set
-# performance can be contextualized.
+# Val: HOLDOUT_SEASON, GW2 through TEST_GW_START - 1 (GW 2-33)
+# Test: HOLDOUT_SEASON, GW TEST_GW_START through 38 (= GW 34-38)
 TEST_GW_START = 34
 
-# === K-means ===
+# K-means Configs
 K_CLUSTERS = 4
-KMEANS_FIT_MIN_GWS = 5     # min GWs played for a player-season to enter the K-means fit
-KMEANS_ASSIGN_MIN_GWS = 3  # min GWs played for a player-season to be eligible for centroid lookup
+KMEANS_FIT_MIN_GWS = 5
+KMEANS_ASSIGN_MIN_GWS = 3 
 KMEANS_RANDOM_STATE = 42
 KMEANS_FEATURES = [
     "mean_minutes_per_gw",
@@ -42,22 +34,15 @@ KMEANS_FEATURES = [
     "mean_threat_per_app",
     "mean_value",
 ]
-# Position one-hots are deliberately NOT in KMEANS_FEATURES.
-# Including them caused position rediscovery (silhouette 0.45 but clusters
-# were ~99% single-position). Without them, the algorithm finds within-position
-# style structure (e.g. attacking fullbacks clustering with creative MIDs).
 
 CLUSTER_NAMES = {
-    0: "Defensive starters",      # 16% GK + 72% DEF, full minutes, low attacking output
-    1: "Rotational / fringe",     # mostly attackers (62% MID + 20% FWD), low minutes
-    2: "Premium attackers",       # high threat (~30), high price (~£8.3m), captaincy candidates
-    3: "Creative regulars",       # cross-positional starters with attacking output
-    K_CLUSTERS: "Unclassified",   # insufficient data: new-to-PL players + low-minute fringe
+    0: "Defensive starters",
+    1: "Rotational / fringe",
+    2: "Premium attackers",
+    3: "Creative regulars",
+    K_CLUSTERS: "Unclassified",
 }
 
-# === Feature groups ===
-# Every non-ID/non-target column in the processed CSV belongs to exactly one group.
-# Downstream model code: `from src.config import get_feature_group`
 FEATURE_GROUPS = {
     "IDS": [
         "name", "name_key", "season", "GW",
@@ -96,20 +81,14 @@ FEATURE_GROUPS = {
 
 
 def get_feature_group(name: str) -> list[str]:
-    """Return the column list for a named feature group."""
     if name not in FEATURE_GROUPS:
         raise KeyError(
-            f"Unknown feature group: {name!r}. Valid: {sorted(FEATURE_GROUPS)}"
+            f"Unknown feature group"
         )
     return list(FEATURE_GROUPS[name])
 
 
 def get_splits(df: pd.DataFrame) -> tuple[pd.Series, pd.Series, pd.Series]:
-    """
-    Return (train_mask, val_mask, test_mask) — boolean Series aligned to df.index.
-
-    Asserts disjoint and exhaustive coverage of df.
-    """
     train_mask = df["season"].isin(TRAIN_SEASONS)
     holdout = df["season"] == HOLDOUT_SEASON
     val_mask = holdout & (df["GW"] < TEST_GW_START)

@@ -1,19 +1,6 @@
 """
-End-to-end FPL data prep pipeline.
-
-Raw merged_gw.csv per season -> processed modeling table with:
-  - DGW rows collapsed (sum stats, first for prekickoff/market columns)
-  - Lag-1 and roll-3 features for 15 stats, computed within player_season
-  - Stage-1 hurdle labels: played_60min (per-fixture max rule), played_any
-  - Position one-hots (GKP normalized to GK to fix 21/22 inconsistency)
-  - Cluster IDs from K-means on playing-style features (train-only fit)
-
-Run as:
-    uv run python -m src.data_prep      # (or `python -m src.data_prep`)
-
-Output: data/processed/fpl_modeling_data.csv
+Prepping the data after having collected it. This is our preprocessing step
 """
-from __future__ import annotations
 
 import unicodedata
 
@@ -36,24 +23,17 @@ from src.config import (
     TRAIN_SEASONS,
 )
 
-# Stats that get lag1 and roll3 versions
 LAG_STATS = [
     "total_points", "minutes", "goals_scored", "assists", "clean_sheets",
     "goals_conceded", "bonus", "bps", "saves", "influence", "creativity",
     "threat", "ict_index", "yellow_cards", "red_cards",
 ]
 
-# DGW collapse rules
 DGW_FIRST_COLS = [
     "name", "team", "position", "was_home", "opponent_team", "value",
     "selected", "transfers_in", "transfers_out", "transfers_balance", "xP",
 ]
-DGW_SUM_COLS = LAG_STATS  # all post-kickoff stats sum across DGW fixtures
-
-
-# ---------------------------------------------------------------------------
-# Loading and normalization
-# ---------------------------------------------------------------------------
+DGW_SUM_COLS = LAG_STATS
 
 def normalize_name(s) -> str:
     """Lowercase + strip diacritics. Stable cross-season join key."""
@@ -67,17 +47,13 @@ def normalize_name(s) -> str:
 
 
 def load_raw_season(season: str) -> pd.DataFrame:
-    """Load merged_gw for one season, normalize position string and add name_key."""
     df = pd.read_csv(RAW_DIR / season / "merged_gw.csv", low_memory=False)
     df["season"] = season
     df["name_key"] = df["name"].map(normalize_name)
-    df["position"] = df["position"].replace({"GKP": "GK"})  # 21/22 had 80 GKP rows
+    df["position"] = df["position"].replace({"GKP": "GK"})
     return df
 
-
-# ---------------------------------------------------------------------------
 # Stage-1 labels (computed BEFORE DGW collapse)
-# ---------------------------------------------------------------------------
 
 def compute_stage1_labels(raw: pd.DataFrame) -> pd.DataFrame:
     """
